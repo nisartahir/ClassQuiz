@@ -1,4 +1,4 @@
-name: CI Pipeline fro dagger
+name: CI Pipeline for dagger
 on: [ push ]
 jobs:
   build:
