@@ -5,6 +5,40 @@ from dagger import dag, function, object_type
 class ClassQuiz:
 
     @function
+    async def ci(self, context: dagger.Directory) -> dagger.Directory:
+        """Run all pipeline stages."""
+        await self.pytest(context)
+        return await self.vulnerability_scan(context)
+
+    @function
+    async def pytest(self, context: dagger.Directory) -> str:
+        """Run pytest and return its output."""
+        return await (
+            self.backend(context)
+            .with_exec(["pip", "install", "--upgrade", "pip"])
+            .with_exec(["pip", "install", "--upgrade", "pytest"])
+            .with_exec(["pytest", "classquiz/tests/", "--ignore=classquiz/tests/test_server.py"])
+            .stdout()
+        )
+
+    @function
+    async def build(self, context: dagger.Directory) -> dagger.Container:
+        """Returns a container built with the given context."""
+        return await dag.container().build(context)
+
+    @function
+    async def vulnerability_scan(self, context: dagger.Directory) -> dagger.Directory:
+        """Builds the front- and backend, performs a Trivy scan and returns the directory containing the reports."""
+        trivy = dag.trivy()
+
+        directory = (
+            dag.directory()
+            .with_file("scans/backend.sarif", trivy.container(await self.build(context)).report("sarif"))
+            .with_file("scans/frontend.sarif", trivy.container(await self.build(context.directory("frontend"))).report("sarif"))
+        )
+        return directory
+
+    @function
     def frontend(self, context: dagger.Directory) -> dagger.Container:
         """Returns a frontend container built with the given context and params."""
         return (
@@ -38,15 +72,6 @@ class ClassQuiz:
             .with_service_binding("redisd", self.redis())
             .build(context)
         )
-    
-    @function
-    def build(self, context: dagger.Directory) -> dagger.Container:
-        """Returns a container built with the given context."""
-        return (
-            dag.container()
-            .build(context)
-        )
-
 
     @function
     def redis(self) -> dagger.Service:
@@ -93,20 +118,3 @@ class ClassQuiz:
             .with_exposed_port(8080)
             .as_service()
         )
-    @function
-    async def pytest(self, context: dagger.Directory) -> str:
-        """Run pytest and return its output."""
-        return await (
-            self.backend(context)
-            .with_exec(["pip", "install", "--upgrade", "pip"])
-            .with_exec(["pip", "install", "--upgrade", "pytest"])
-            .with_exec(["pytest", "classquiz/tests/", "--ignore=classquiz/tests/test_server.py"])
-            .stdout()
-        )
-    @function
-    async def ci(self, context: dagger.Directory) -> dagger.Directory:
-        """Run all pipeline stages."""
-        await self.pytest(context)
-        return await self.vulnerability_scan(context)
-
-
