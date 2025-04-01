@@ -1,0 +1,37 @@
+name: "Dagger for GitHub"
+description: "A GitHub Action that wraps the Dagger CLI for executing Dagger commands."
+author: "Your Name or Team <you@example.com>"
+
+inputs:
+  version:
+    description: "The version of the Dagger CLI to use (e.g., 'latest' or 'v0.8.0')."
+    required: false
+    default: "latest"
+  verb:
+    description: "The Dagger command verb to run (e.g., 'call', 'run')."
+    required: true
+  module:
+    description: "The module path to load for Dagger."
+    required: false
+    default: "."
+  args:
+    description: "Additional arguments to pass to the Dagger command."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Dagger CLI
+      shell: bash
+      run: |
+        # Check if Dagger is already installed
+        if ! command -v dagger >/dev/null 2>&1; then
+          echo "Installing Dagger CLI..."
+          curl -sfL https://get.dagger.io | sh
+        fi
+        dagger --version
+    - name: Execute Dagger command
+      shell: bash
+      run: |
+        set -x
+        dagger ${{ inputs.verb }} --mod ${{ inputs.module }} ${{ inputs.args }}
